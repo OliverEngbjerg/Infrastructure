@@ -8,6 +8,7 @@ services:
             - "81:81"
             - "443:443"
             - "42420:42420"
+            - "42420:42420/udp"
         volumes:
             - nginxproxymanager_data:/data
             - ./nginx/letsencrypt:/etc/letsencrypt
@@ -69,8 +70,8 @@ services:
         restart: unless-stopped
         tty: true
         stdin_open: true
-        ports:
-            - "42420:42420"
+        expose:
+            - "42420"
         volumes:
             - vintagestoryserver_data:/srv/gameserver/data/vs
         environment:
