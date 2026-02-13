@@ -62,6 +62,21 @@ services:
             - ./oliver-files:/usr/share/caddy
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
 
+    vintagestoryserver:
+        image: quartzar/vintage-story-server:latest
+        container_name: vintagestoryserver
+        restart: unless-stopped
+        tty: true
+        stdin_open: true
+        ports:
+            - "42420:42420"
+        volumes:
+            - vintagestoryserver_data:/srv/gameserver/data/vs
+        environment:
+            - TZ=Europe/Copenhagen
+            - VS_VERSION=stable
+
 volumes:
     idle-rpg-data:
     jellyfin_config:
+    vintagestoryserver_data:
