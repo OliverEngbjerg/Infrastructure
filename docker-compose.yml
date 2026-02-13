@@ -74,7 +74,7 @@ services:
             - vintagestoryserver_data:/srv/gameserver/data/vs
         environment:
             - TZ=Europe/Copenhagen
-            - VERSION=stable
+            - VERSION=1.21.6
 
 volumes:
     nginxproxymanager_data:
