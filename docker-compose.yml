@@ -8,7 +8,7 @@ services:
             - "81:81"
             - "443:443"
         volumes:
-            - ./nginx/data:/data
+            - nginxproxymanager_data:/data
             - ./nginx/letsencrypt:/etc/letsencrypt
 
     ddnsupdater:
@@ -77,6 +77,7 @@ services:
             - VS_VERSION=stable
 
 volumes:
+    nginxproxymanager_data:
     idle-rpg-data:
     jellyfin_config:
     vintagestoryserver_data:
