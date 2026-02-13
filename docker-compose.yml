@@ -1,0 +1,67 @@
+services:
+    nginxproxymanager:
+        image: "jc21/nginx-proxy-manager:latest"
+        container_name: nginxproxymanager
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "81:81"
+            - "443:443"
+        volumes:
+            - ./nginx/data:/data
+            - ./nginx/letsencrypt:/etc/letsencrypt
+
+    ddnsupdater:
+        image: qmcgaw/ddns-updater
+        container_name: ddnsupdater
+        restart: unless-stopped
+        environment:
+            - PERIOD=5m
+            - 'CONFIG={"settings":[{"provider":"porkbun","domain":"engbjerg.com","host":"@","api_key":"${PORKBUN_API_KEY}","secret_api_key":"${PORKBUN_SECRET_KEY}","ip_version":"ipv4"}]}'
+
+    idlerpg:
+        image: "ghcr.io/frederikja163/idlerpg:latest"
+        pull_policy: always
+        container_name: idlerpg
+        restart: unless-stopped
+        ports:
+            - "4022:22"
+            - "4000:4000"
+        environment:
+            - SSH_USER=${IDLERPG_SSH_USER}
+            - SSH_PUBLIC_KEY=${IDLERPG_SSH_PUBLIC_KEY}
+            - TLS_CERT_PATH=/certs/live/npm-2/fullchain.pem
+            - TLS_KEY_PATH=/certs/live/npm-2/privkey.pem
+            - ADMIN_PASSWORD=${IDLERPG_ADMIN_PASSWORD}
+        volumes:
+            - ./nginx/letsencrypt:/certs:ro
+            - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
+
+    jellyfin:
+        image: linuxserver/jellyfin:latest
+        container_name: jellyfin
+        restart: unless-stopped
+        ports:
+            - "8096:8096"
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - TZ=Europe/Copenhagen
+        volumes:
+            - jellyfin_config:/config
+            - "/media/SeagateHub/Film og serier/Film:/data/Film"
+            - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
+
+    caddy:
+        image: caddy:alpine
+        container_name: caddy
+        restart: unless-stopped
+        volumes:
+            - ./caddy_data:/data
+            - ./caddy_config:/config
+            - ./oliver-files:/usr/share/caddy
+        command: caddy file-server --browse --root /usr/share/caddy --listen :80
+
+volumes:
+    idle-rpg-data:
+    jellyfin_config:
