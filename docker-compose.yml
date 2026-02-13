@@ -7,6 +7,8 @@ services:
             - "80:80"
             - "81:81"
             - "443:443"
+            - "42420:42420"
+            - "42420:42420/udp"
         volumes:
             - nginxproxymanager_data:/data
             - ./nginx/letsencrypt:/etc/letsencrypt
