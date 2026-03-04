@@ -78,8 +78,23 @@ services:
             - TZ=Europe/Copenhagen
             - VERSION=1.21.6
 
+    vintagestoryservermods:
+        image: quartzar/vintage-story-server:latest
+        container_name: vintagestoryservermods
+        restart: unless-stopped
+        tty: true
+        stdin_open: true
+        expose:
+            - "42421"
+        volumes:
+            - vintagestoryservermods_data:/srv/gameserver/data/vs
+        environment:
+            - TZ=Europe/Copenhagen
+            - VERSION=1.21.6
+
 volumes:
     nginxproxymanager_data:
     idle-rpg-data:
     jellyfin_config:
     vintagestoryserver_data:
+    vintagestoryservermods_data:
