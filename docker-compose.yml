@@ -84,8 +84,8 @@ services:
         restart: unless-stopped
         tty: true
         stdin_open: true
-        expose:
-            - "42421"
+        ports:
+            - "42421:42421"
         volumes:
             - vintagestoryservermods_data:/srv/gameserver/data/vs
         environment:
