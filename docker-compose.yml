@@ -85,7 +85,7 @@ services:
         tty: true
         stdin_open: true
         ports:
-            - "42421:42421"
+            - "42421:42420"
         volumes:
             - vintagestoryservermods_data:/srv/gameserver/data/vs
         environment:
