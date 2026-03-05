@@ -70,8 +70,8 @@ services:
         restart: unless-stopped
         tty: true
         stdin_open: true
-        expose:
-            - "42420"
+        ports:
+            - "42420:42420"
         volumes:
             - vintagestoryserver_data:/srv/gameserver/data/vs
         environment:
