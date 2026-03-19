@@ -111,9 +111,6 @@ services:
             TZ: "Europe/Copenhagen"
             DIFFICULTY: "2"
             ENABLE_WHITELIST: "true"
-            WHITELIST: |-
-                OliverEC04
-                FrederikJA
         volumes:
             - mcskyfactory5_data:/data
 
