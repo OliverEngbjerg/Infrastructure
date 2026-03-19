@@ -94,6 +94,7 @@ services:
     mcskyfactory5:
         image: itzg/minecraft-server:latest
         container_name: mcskyfactory5
+        restart: unless-stopped
         tty: true
         stdin_open: true
         ports:
@@ -103,7 +104,8 @@ services:
             TYPE: "AUTO_CURSEFORGE"
             VERSION: "1.20.1"
             CF_PAGE_URL: "https://www.curseforge.com/minecraft/modpacks/skyfactory-5/files/6290684"
-            CF_API_KEY: "${CURSEFORGE_API_KEY}"
+            CF_API_KEY: ${CURSEFORGE_API_KEY}
+            MEMORY: "6144M"
             MOTD: "Ich möchte meinkampf spielen"
             ICON: "https://media.forgecdn.net/avatars/thumbnails/1146/284/64/64/638712506299204333_animated.gif"
             TZ: "Europe/Copenhagen"
