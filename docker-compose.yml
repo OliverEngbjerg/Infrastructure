@@ -19,6 +19,14 @@ services:
             - PERIOD=5m
             - 'CONFIG={"settings":[{"provider":"porkbun","domain":"engbjerg.com","host":"@","api_key":"${PORKBUN_API_KEY}","secret_api_key":"${PORKBUN_SECRET_KEY}","ip_version":"ipv4"}]}'
 
+    dashboard:
+        image: "ghcr.io/oliverengbjerg/dashboard:latest"
+        pull_policy: always
+        container_name: dashboard
+        restart: unless-stopped
+        ports:
+            - "3000:3000"
+
     idlerpg:
         image: "ghcr.io/frederikja163/idlerpg:latest"
         pull_policy: always
@@ -61,6 +69,15 @@ services:
             - ./caddy_config:/config
             - ./oliver-files:/usr/share/caddy
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
+
+    # postgres:
+    #     image: postgres:14
+    #     container_name: postgres
+    #     restart: unless-stopped
+    #     ports:
+    #         - "5432:5432"
+    #     volumes:
+    #         - idk
 
     vintagestoryserver:
         image: quartzar/vintage-story-server:latest
