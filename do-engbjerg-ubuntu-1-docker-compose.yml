@@ -9,6 +9,7 @@ services:
       - "443:443"
     volumes:
       - nginxproxymanager_data:/data
+      - ./nginx/letsencrypt:/etc/letsencrypt
 
   uptimekuma:
     image: louislam/uptime-kuma:1
