@@ -1,4 +1,15 @@
 services:
+  nginxproxymanager:
+    image: "jc21/nginx-proxy-manager:latest"
+    container_name: nginxproxymanager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - nginxproxymanager_data:/data
+
   uptimekuma:
     image: louislam/uptime-kuma:1
     container_name: uptimekuma
@@ -9,4 +20,5 @@ services:
       - uptimekuma_data:/app/data
 
 volumes:
+  nginxproxymanager_data:
   uptimekuma_data:
