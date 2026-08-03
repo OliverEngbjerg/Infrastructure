@@ -79,19 +79,19 @@ services:
     #     volumes:
     #         - idk
 
-    vintagestoryserver:
-        image: quartzar/vintage-story-server:latest
-        container_name: vintagestoryserver
-        restart: unless-stopped
-        tty: true
-        stdin_open: true
-        ports:
-            - "42420:42420"
-        volumes:
-            - vintagestoryserver_data:/srv/gameserver/data/vs
-        environment:
-            - TZ=Europe/Copenhagen
-            - VERSION=1.21.6
+    # vintagestoryserver:
+    #     image: quartzar/vintage-story-server:latest
+    #     container_name: vintagestoryserver
+    #     restart: unless-stopped
+    #     tty: true
+    #     stdin_open: true
+    #     ports:
+    #         - "42420:42420"
+    #     volumes:
+    #         - vintagestoryserver_data:/srv/gameserver/data/vs
+    #     environment:
+    #         - TZ=Europe/Copenhagen
+    #         - VERSION=1.21.6
 
     # vintagestoryservermods:
     #     image: quartzar/vintage-story-server:latest
