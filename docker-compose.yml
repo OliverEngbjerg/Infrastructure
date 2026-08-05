@@ -19,11 +19,24 @@ services:
             - PERIOD=5m
             - 'CONFIG={"settings":[{"provider":"porkbun","domain":"engbjerg.com","host":"@","api_key":"${PORKBUN_API_KEY}","secret_api_key":"${PORKBUN_SECRET_KEY}","ip_version":"ipv4"}]}'
 
+    watchtower:
+        image: containrrr/watchtower
+        container_name: watchtower
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+            - WATCHTOWER_CLEANUP=true
+            - WATCHTOWER_POLL_INTERVAL=86400
+            - WATCHTOWER_LABEL_ENABLE=true
+
     dashboard:
         image: "ghcr.io/oliverengbjerg/dashboard:latest"
         pull_policy: always
         container_name: dashboard
         restart: unless-stopped
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
         ports:
             - "3000:3000"
 
