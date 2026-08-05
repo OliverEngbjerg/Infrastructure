@@ -20,7 +20,7 @@ services:
             - 'CONFIG={"settings":[{"provider":"porkbun","domain":"engbjerg.com","host":"@","api_key":"${PORKBUN_API_KEY}","secret_api_key":"${PORKBUN_SECRET_KEY}","ip_version":"ipv4"}]}'
 
     watchtower:
-        image: containrrr/watchtower
+        image: nickfedor/watchtower
         container_name: watchtower
         restart: unless-stopped
         volumes:
