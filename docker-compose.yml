@@ -83,6 +83,28 @@ services:
             - ./oliver-files:/usr/share/caddy
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
 
+    # CalDAV/CardDAV server. Reached via NPM at radicale:5232 (no host port).
+    # Auth is htpasswd (bcrypt); create ./radicale/config/users on the server:
+    #   htpasswd -B -c radicale/config/users <username>
+    radicale:
+        image: tomsquest/docker-radicale:latest
+        container_name: radicale
+        restart: unless-stopped
+        init: true
+        read_only: true
+        security_opt:
+            - no-new-privileges:true
+        cap_drop:
+            - ALL
+        cap_add:
+            - CHOWN
+            - SETUID
+            - SETGID
+            - KILL
+        volumes:
+            - radicale_data:/data
+            - ./radicale/config:/config:ro
+
     # postgres:
     #     image: postgres:14
     #     container_name: postgres
@@ -174,6 +196,7 @@ volumes:
     nginxproxymanager_data:
     idle-rpg-data:
     jellyfin_config:
+    radicale_data:
     vintagestoryserver_data:
     vintagestoryservermods_data:
     mcskyfactory5_data:
