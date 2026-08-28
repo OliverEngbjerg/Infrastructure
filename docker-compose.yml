@@ -85,13 +85,16 @@ services:
 
     # CalDAV/CardDAV server. Reached via NPM at radicale:5232 (no host port).
     # Config and htpasswd users are mounted from the inline `configs:` at the bottom.
-    # RADICALE_USERS is a Portainer stack env var holding "user:bcrypt-hash" line(s).
+    # RADICALE_USERS is a Portainer stack env var holding a "user:bcrypt-hash" line.
+    # In Portainer, wrap the value in SINGLE QUOTES ('user:$2b$12$...') - otherwise
+    # Compose expands the $-parts of the hash as variables and corrupts it.
+    # No read_only here: Compose injects inline configs with `docker cp`, which
+    # Docker refuses on a read-only rootfs (container is left in "Created").
     radicale:
         image: tomsquest/docker-radicale:latest
         container_name: radicale
         restart: unless-stopped
         init: true
-        read_only: true
         security_opt:
             - no-new-privileges:true
         cap_drop:
@@ -102,7 +105,7 @@ services:
             - SETGID
             - KILL
         environment:
-            # Named volume already has uid 2999 ownership; chown fails under read_only (tomsquest#230)
+            # Named volume already has uid 2999 ownership; skip the entrypoint's chown -R
             - TAKE_FILE_OWNERSHIP=false
         configs:
             - source: radicale_config
