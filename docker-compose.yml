@@ -101,6 +101,9 @@ services:
             - SETUID
             - SETGID
             - KILL
+        environment:
+            # Named volume already has uid 2999 ownership; chown fails under read_only (tomsquest#230)
+            - TAKE_FILE_OWNERSHIP=false
         volumes:
             - radicale_data:/data
             - ./radicale/config:/config:ro
