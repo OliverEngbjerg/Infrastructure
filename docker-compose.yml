@@ -79,7 +79,7 @@ services:
         restart: unless-stopped
         pull_policy: always
         environment:
-            PUBLIC_WS_URL: wss://openidle-dev-api.engbjerg.com/ws
+            PUBLIC_WS_URL: wss://openidle-backend-dev.engbjerg.com/ws
             PUBLIC_ALLOW_WS_OVERRIDE: "true"
             ORIGIN: https://openidle-dev.engbjerg.com
         # Internal port: 3000
@@ -105,7 +105,7 @@ services:
         restart: unless-stopped
         pull_policy: always
         environment:
-            PUBLIC_WS_URL: wss://openidle-api.engbjerg.com/ws
+            PUBLIC_WS_URL: wss://openidle-backend.engbjerg.com/ws
             ORIGIN: https://openidle.engbjerg.com
         # Internal port: 3000
 
