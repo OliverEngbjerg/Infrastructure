@@ -37,8 +37,7 @@ services:
         restart: unless-stopped
         labels:
             - "com.centurylinklabs.watchtower.enable=true"
-        # ports:
-        #     - "3000:3000"
+        # Internal port: 3000
 
     idlerpg:
         image: "ghcr.io/frederikja163/idlerpg:latest"
@@ -61,6 +60,8 @@ services:
     openidle-backend-dev:
         image: ghcr.io/frederikja163/openidle-backend:dev
         container_name: openidle-backend-dev
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
         restart: unless-stopped
         pull_policy: always
         volumes:
@@ -70,6 +71,8 @@ services:
     openidle-frontend-dev:
         image: ghcr.io/frederikja163/openidle-frontend:dev
         container_name: openidle-frontend-dev
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
         restart: unless-stopped
         pull_policy: always
         environment:
@@ -79,6 +82,8 @@ services:
     openidle-backend:
         image: ghcr.io/frederikja163/openidle-backend:prod
         container_name: openidle-backend
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
         restart: unless-stopped
         pull_policy: always
         volumes:
@@ -88,6 +93,8 @@ services:
     openidle-frontend:
         image: ghcr.io/frederikja163/openidle-frontend:prod
         container_name: openidle-frontend
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
         restart: unless-stopped
         pull_policy: always
         environment:
