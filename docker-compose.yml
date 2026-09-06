@@ -159,7 +159,7 @@ services:
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
 
     # CalDAV/CardDAV server. Reached via NPM at radicale:5232 (no host port).
-    # Config (configs/radicale.conf) and htpasswd users are mounted via `configs:` at the bottom.
+    # Config and htpasswd users are mounted from the inline `configs:` at the bottom.
     # RADICALE_USERS is a Portainer stack env var holding a "user:bcrypt-hash" line.
     # In Portainer, wrap the value in SINGLE QUOTES ('user:$2b$12$...') - otherwise
     # Compose expands the $-parts of the hash as variables and corrupts it.
@@ -290,13 +290,39 @@ volumes:
     mcskyfactory5_data:
     mcstoneblock_data:
 
-# File-based configs are read from the repo checkout at deploy time and injected
-# into the container with `docker cp`, so they don't depend on host bind-mount paths.
+# Configs must be inline `content:` here. `file:` configs are bind mounts resolved
+# against host /data/compose/6, where Portainer's git checkout does not exist.
 configs:
+    # ntfy message template for Instatus webhook subscribers. Instatus posts a
+    # Statuspage-style JSON payload (incident / maintenance with a list of updates,
+    # newest first). Used via ?template=instatus on the publish URL.
     ntfy_instatus_template:
-        file: ./configs/ntfy-instatus.yml
+        content: |
+            title: |
+              {{- if .incident }}{{ .incident.name }} [{{ .incident.status }}]
+              {{- else if .maintenance }}Maintenance: {{ .maintenance.name }} [{{ .maintenance.status }}]
+              {{- end }}
+            message: |
+              {{- if .incident }}{{ (first .incident.incident_updates).body }}
+              {{- else if .maintenance }}{{ (first .maintenance.maintenance_updates).body }}
+              {{- end }}
+            priority: |
+              {{- if and .incident (ne .incident.status "RESOLVED") }}4{{ else }}3{{ end }}
     radicale_config:
-        file: ./configs/radicale.conf
+        content: |
+            [server]
+            hosts = 0.0.0.0:5232
+
+            [auth]
+            type = htpasswd
+            htpasswd_filename = /config/users
+            htpasswd_encryption = bcrypt
+
+            [storage]
+            filesystem_folder = /data/collections
+
+            [rights]
+            type = owner_only
     # Generate a line with:
     #   docker run --rm -e U=<user> -e PW='<password>' --entrypoint /venv/bin/python tomsquest/docker-radicale:latest \
     #     -c 'import os,bcrypt;print(os.environ["U"]+":"+bcrypt.hashpw(os.environ["PW"].encode(),bcrypt.gensalt()).decode())'
