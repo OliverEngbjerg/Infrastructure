@@ -1,0 +1,13 @@
+# ntfy message template for Instatus webhook subscribers.
+# Instatus posts a Statuspage-style JSON payload (incident / maintenance with a
+# list of updates, newest first). Used via ?template=instatus on the publish URL.
+title: |
+  {{- if .incident }}{{ .incident.name }} [{{ .incident.status }}]
+  {{- else if .maintenance }}Maintenance: {{ .maintenance.name }} [{{ .maintenance.status }}]
+  {{- end }}
+message: |
+  {{- if .incident }}{{ (first .incident.incident_updates).body }}
+  {{- else if .maintenance }}{{ (first .maintenance.maintenance_updates).body }}
+  {{- end }}
+priority: |
+  {{- if and .incident (ne .incident.status "RESOLVED") }}4{{ else }}3{{ end }}

@@ -46,6 +46,10 @@ services:
             NTFY_REQUIRE_LOGIN: "true"
             NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
             NTFY_AUTH_USERS: ${NTFY_AUTH_USERS:?set NTFY_AUTH_USERS (user:bcrypt-hash:role) in the Portainer stack env vars}
+        configs:
+            # Instatus webhook template, used via ?template=instatus on the publish URL
+            - source: ntfy_instatus_template
+              target: /etc/ntfy/templates/instatus.yml
         volumes:
             - ntfy_data:/var/lib/ntfy
         # Internal port: 80
@@ -155,7 +159,7 @@ services:
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
 
     # CalDAV/CardDAV server. Reached via NPM at radicale:5232 (no host port).
-    # Config and htpasswd users are mounted from the inline `configs:` at the bottom.
+    # Config (configs/radicale.conf) and htpasswd users are mounted via `configs:` at the bottom.
     # RADICALE_USERS is a Portainer stack env var holding a "user:bcrypt-hash" line.
     # In Portainer, wrap the value in SINGLE QUOTES ('user:$2b$12$...') - otherwise
     # Compose expands the $-parts of the hash as variables and corrupts it.
@@ -286,22 +290,13 @@ volumes:
     mcskyfactory5_data:
     mcstoneblock_data:
 
+# File-based configs are read from the repo checkout at deploy time and injected
+# into the container with `docker cp`, so they don't depend on host bind-mount paths.
 configs:
+    ntfy_instatus_template:
+        file: ./configs/ntfy-instatus.yml
     radicale_config:
-        content: |
-            [server]
-            hosts = 0.0.0.0:5232
-
-            [auth]
-            type = htpasswd
-            htpasswd_filename = /config/users
-            htpasswd_encryption = bcrypt
-
-            [storage]
-            filesystem_folder = /data/collections
-
-            [rights]
-            type = owner_only
+        file: ./configs/radicale.conf
     # Generate a line with:
     #   docker run --rm -e U=<user> -e PW='<password>' --entrypoint /venv/bin/python tomsquest/docker-radicale:latest \
     #     -c 'import os,bcrypt;print(os.environ["U"]+":"+bcrypt.hashpw(os.environ["PW"].encode(),bcrypt.gensalt()).decode())'
