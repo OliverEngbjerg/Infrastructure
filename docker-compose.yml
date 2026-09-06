@@ -43,7 +43,9 @@ services:
             NTFY_AUTH_FILE: /var/lib/ntfy/auth.db
             NTFY_AUTH_DEFAULT_ACCESS: deny-all
             NTFY_ENABLE_LOGIN: "true"
+            NTFY_REQUIRE_LOGIN: "true"
             NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+            NTFY_AUTH_USERS: ${NTFY_AUTH_USERS:?set NTFY_AUTH_USERS (user:bcrypt-hash:role) in the Portainer stack env vars}
         volumes:
             - ntfy_data:/var/lib/ntfy
         # Internal port: 80
