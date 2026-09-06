@@ -294,13 +294,23 @@ volumes:
 # against host /data/compose/6, where Portainer's git checkout does not exist.
 configs:
     # ntfy message template for Instatus webhook subscribers. Instatus posts a
-    # Statuspage-style JSON payload (incident / maintenance with a list of updates,
-    # newest first). Used via ?template=instatus on the publish URL.
+    # Statuspage-style JSON payload: incident / maintenance (with a list of updates,
+    # newest first) or a component status change. Used via ?template=instatus on the
+    # publish URL. Templates can only set title/message/priority, so the icon and the
+    # click-through link are static query params on the webhook URL in Instatus:
+    #   https://ntfy.engbjerg.com/status?template=instatus
+    #     &click=https://engbjerg.instatus.com
+    #     &icon=https://instatus.com/user-content/v1788031818/pgkscazg5w9saobu8nii.png
+    #     &auth=<base64 of "Bearer tk_...">
     ntfy_instatus_template:
         content: |
             title: |
-              {{- if .incident }}{{ .incident.name }} [{{ .incident.status }}]
-              {{- else if .maintenance }}Maintenance: {{ .maintenance.name }} [{{ .maintenance.status }}]
+              {{- if .incident }}
+                {{- if eq .incident.status "RESOLVED" }}✅ {{ else }}❌ {{ end }}{{ .incident.name }} [{{ .incident.status }}]
+              {{- else if .maintenance }}
+                {{- if eq .maintenance.status "COMPLETED" }}✅ {{ else }}🛠️ {{ end }}Maintenance: {{ .maintenance.name }} [{{ .maintenance.status }}]
+              {{- else if .component }}
+                {{- if eq .component.status "OPERATIONAL" }}✅ {{ else }}❌ {{ end }}{{ .component.name }} is {{ .component.status | lower }}
               {{- else }}Status page update
               {{- end }}
             message: |
@@ -310,7 +320,9 @@ configs:
               {{- else }}(no details in payload)
               {{- end }}
             priority: |
-              {{- if and .incident (ne .incident.status "RESOLVED") }}4{{ else }}3{{ end }}
+              {{- if and .incident (ne .incident.status "RESOLVED") }}4
+              {{- else if and .component (ne .component.status "OPERATIONAL") }}4
+              {{- else }}3{{ end }}
     radicale_config:
         content: |
             [server]
