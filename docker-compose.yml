@@ -46,10 +46,6 @@ services:
             NTFY_REQUIRE_LOGIN: "true"
             NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
             NTFY_AUTH_USERS: ${NTFY_AUTH_USERS:?set NTFY_AUTH_USERS (user:bcrypt-hash:role) in the Portainer stack env vars}
-        configs:
-            # Instatus webhook template, used via ?template=instatus on the publish URL
-            - source: ntfy_instatus_template
-              target: /etc/ntfy/templates/instatus.yml
         volumes:
             - ntfy_data:/var/lib/ntfy
         # Internal port: 80
@@ -293,50 +289,6 @@ volumes:
 # Configs must be inline `content:` here. `file:` configs are bind mounts resolved
 # against host /data/compose/6, where Portainer's git checkout does not exist.
 configs:
-    # ntfy message template for Instatus webhook subscribers. Instatus posts a
-    # Statuspage-style JSON payload: incident / maintenance (with a list of updates,
-    # newest first) or a component status change. Used via ?template=instatus on the
-    # publish URL. Templates can only set title/message/priority, so the icon and the
-    # click-through link are static query params on the webhook URL in Instatus:
-    #   https://ntfy.engbjerg.com/status?template=instatus
-    #     &click=https://engbjerg.instatus.com
-    #     &icon=https://instatus.com/user-content/v1788031818/pgkscazg5w9saobu8nii.png
-    #     &auth=<base64 of "Bearer tk_...">
-    #
-    # A monitor going down fires TWO webhooks: an incident, AND the linked component
-    # flipping to MAJOROUTAGE. A template cannot drop a message, so component events
-    # render at priority 1 (ntfy `min`: delivered, but no sound/vibration/popup) and
-    # the incident is the one that actually alerts. To stop the second POST at the
-    # source, turn off "publish to your status page" on the monitor in Instatus, or
-    # unlink its component.
-    #
-    # Casing differs per payload type and contradicts Instatus' own docs: component
-    # statuses arrive uppercase (OPERATIONAL), incident statuses title-cased
-    # (Resolved). So every eq is lower-cased on both sides, and the resolved check
-    # also accepts a non-empty .incident.resolved_at as a second, independent signal.
-    ntfy_instatus_template:
-        content: |
-            title: |
-              {{- if .incident }}
-                {{- if or (eq (lower .incident.status) "resolved") .incident.resolved_at }}✅ {{ else }}❌ {{ end }}{{ .incident.name }} [{{ .incident.status }}]
-              {{- else if .maintenance }}
-                {{- if eq (lower .maintenance.status) "completed" }}✅ {{ else }}🛠️ {{ end }}Maintenance: {{ .maintenance.name }} [{{ .maintenance.status }}]
-              {{- else if .component }}
-                {{- if eq (lower .component.status) "operational" }}✅ {{ else }}❌ {{ end }}{{ .component.name }} is {{ .component.status | lower }}
-              {{- else }}Status page update
-              {{- end }}
-            message: |
-              {{- if and .incident .incident.incident_updates }}{{ (first .incident.incident_updates).body }}
-              {{- else if and .maintenance .maintenance.maintenance_updates }}{{ (first .maintenance.maintenance_updates).body }}
-              {{- else if .page }}{{ .page.status_description }}
-              {{- else }}(no details in payload)
-              {{- end }}
-            priority: |
-              {{- if and .incident (or (eq (lower .incident.status) "resolved") .incident.resolved_at) }}3
-              {{- else if .incident }}4
-              {{- else if .maintenance }}3
-              {{- else if .component }}1
-              {{- else }}3{{ end }}
     radicale_config:
         content: |
             [server]
