@@ -50,6 +50,25 @@ services:
             - ntfy_data:/var/lib/ntfy
         # Internal port: 80
 
+    # Polls the GitHub notifications API and publishes to ntfy. Lives in this stack rather
+    # than its own so it can reach ntfy at the internal `http://ntfy` instead of going out
+    # and back through NPM. The token's ntfy user needs write access to the `github` topic
+    # explicitly, since the server above runs deny-all.
+    ntfybridge:
+        image: "ghcr.io/oliverengbjerg/ntfybridge:latest"
+        pull_policy: always
+        container_name: ntfybridge
+        restart: unless-stopped
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        environment:
+            TZ: Europe/Copenhagen
+            Ntfy__Token: ${NTFYBRIDGE_NTFY_TOKEN:?set NTFYBRIDGE_NTFY_TOKEN (ntfy tk_... token with write access to the github topic) in the Portainer stack env vars}
+            Sources__GitHub__Token: ${NTFYBRIDGE_GITHUB_TOKEN:?set NTFYBRIDGE_GITHUB_TOKEN (GitHub classic PAT with the notifications scope) in the Portainer stack env vars}
+        volumes:
+            - ntfybridge_data:/data
+        # Internal port: 8080 (health only, nothing to proxy)
+
     dashboard:
         image: "ghcr.io/oliverengbjerg/dashboard:latest"
         pull_policy: always
@@ -276,6 +295,7 @@ services:
 volumes:
     nginxproxymanager_data:
     ntfy_data:
+    ntfybridge_data:
     idle-rpg-data:
     openidle-dev-data:
     openidle-data:
