@@ -50,10 +50,6 @@ services:
             - ntfy_data:/var/lib/ntfy
         # Internal port: 80
 
-    # Polls the GitHub notifications API and publishes to ntfy. Lives in this stack rather
-    # than its own so it can reach ntfy at the internal `http://ntfy` instead of going out
-    # and back through NPM. The token's ntfy user needs write access to the `github` topic
-    # explicitly, since the server above runs deny-all.
     ntfybridge:
         image: "ghcr.io/oliverengbjerg/ntfybridge:latest"
         pull_policy: always
