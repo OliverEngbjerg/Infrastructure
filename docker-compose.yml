@@ -149,14 +149,56 @@ services:
         volumes:
             - radicale_data:/data
 
-    # postgres:
-    #     image: postgres:14
-    #     container_name: postgres
-    #     restart: unless-stopped
-    #     ports:
-    #         - "5432:5432"
-    #     volumes:
-    #         - idk
+    # PostgreSQL. Adopted 2026-09 from a bare `docker run` that carried no
+    # compose labels, so this stack could not see or manage it.
+    #
+    # PGDATA is an ABSOLUTE HOST BIND MOUNT on purpose:
+    #   * the directory predates this stack and holds ~246 GB of live data
+    #   * a RELATIVE path would resolve against /data/compose/6, not the git
+    #     checkout, and would silently initdb an EMPTY cluster
+    #   * a named volume cannot be used: `postgres_storage` already exists on
+    #     the obsolete local-persist driver and Docker will not change the
+    #     driver of an existing volume
+    # If you ever change this path, check it twice. A wrong path does not
+    # error - the entrypoint initdb's a NEW EMPTY cluster instead.
+    #
+    # Deliberately NOT watchtower-labelled: image moves must stay manual so a
+    # major version bump can never happen by surprise and eat the cluster.
+    postgres:
+        # Pinned to the digest already running (14.21, trixie, glibc 2.41) so
+        # adopting into compose cannot also change the binary. The version bump
+        # is a separate, deliberate commit.
+        image: postgres@sha256:b964c3211689ffe50cc65235ea338717520954dcf6ecd4d76bf887eba3cbc91f
+        container_name: postgres # zitadel (stack 12) resolves this name on stack_default
+        restart: unless-stopped
+        # The entrypoint treats SIGTERM as a "smart" shutdown that WAITS for
+        # clients to disconnect, overruns the grace period and gets SIGKILLed -
+        # which is why the last restart went through crash recovery. SIGINT is a
+        # fast shutdown: disconnect clients, checkpoint, exit cleanly.
+        stop_signal: SIGINT
+        stop_grace_period: 5m
+        shm_size: 1gb # Docker's 64MB default is too small for parallel query
+        ports:
+            # LAN address only, NEVER 0.0.0.0. ufw does not filter Docker
+            # published ports (the DOCKER-USER chain is empty), so 0.0.0.0 here
+            # means "internet-exposed the moment anything forwards 5432" - which
+            # is exactly how this server absorbed 202k brute-force attempts in
+            # Sept 2026. 192.168.1.23 is static in /etc/netplan/99_config.yaml.
+            - "192.168.1.23:5432:5432"
+        environment:
+            TZ: Europe/Copenhagen
+            # INERT on an existing PGDATA - the entrypoint only reads this when
+            # it runs initdb on an empty directory. Rotate the real password
+            # with ALTER ROLE, not by changing this value.
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the Portainer stack env vars (wrap in SINGLE quotes if it contains $)}
+        volumes:
+            - /home/oliver/docker/volumes/postgres_storage:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -q -U postgres -d postgres"]
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 120s
 
     # vintagestoryserver:
     #     image: quartzar/vintage-story-server:latest
