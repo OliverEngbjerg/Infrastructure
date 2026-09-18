@@ -149,26 +149,33 @@ services:
         volumes:
             - radicale_data:/data
 
-    # PostgreSQL. Adopted 2026-09 from a bare `docker run` that carried no
-    # compose labels, so this stack could not see or manage it.
+    # PostgreSQL 18. Adopted 2026-09 from a bare `docker run` that carried no
+    # compose labels, so this stack could not see or manage it, then upgraded
+    # 14.21 -> 18.6 in place with pg_upgrade --link via pgautoupgrade.
     #
-    # PGDATA is an ABSOLUTE HOST BIND MOUNT on purpose:
-    #   * the directory predates this stack and holds ~246 GB of live data
+    # MOUNT SHAPE MATTERS. PG18 moved PGDATA from /var/lib/postgresql/data to
+    # /var/lib/postgresql/<major>/docker, so the mount target is the PARENT
+    # /var/lib/postgresql and the real PGDATA is .../data/18/docker on the host.
+    # The host path keeps the name `data` for historical reasons - it was the
+    # PG14 PGDATA before the upgrade. Do not "tidy" it without moving the
+    # cluster; the image derives PGDATA from its own default, not from here.
+    #
+    # An ABSOLUTE HOST BIND MOUNT on purpose:
+    #   * the directory holds ~246 GB of live data
     #   * a RELATIVE path would resolve against /data/compose/6, not the git
     #     checkout, and would silently initdb an EMPTY cluster
-    #   * a named volume cannot be used: `postgres_storage` already exists on
-    #     the obsolete local-persist driver and Docker will not change the
-    #     driver of an existing volume
+    #   * a named volume cannot be used: the old `postgres_storage` volume was
+    #     on the obsolete local-persist driver and Docker will not change an
+    #     existing volume's driver
     # If you ever change this path, check it twice. A wrong path does not
-    # error - the entrypoint initdb's a NEW EMPTY cluster instead.
+    # error - it initdb's a NEW EMPTY cluster instead, which is exactly what
+    # happened once during the 2026-09 upgrade before the path was corrected.
     #
     # Deliberately NOT watchtower-labelled: image moves must stay manual so a
     # major version bump can never happen by surprise and eat the cluster.
+    # The tag floats within 18.x so patch releases arrive on deliberate redeploy.
     postgres:
-        # Pinned to the digest already running (14.21, trixie, glibc 2.41) so
-        # adopting into compose cannot also change the binary. The version bump
-        # is a separate, deliberate commit.
-        image: postgres@sha256:b964c3211689ffe50cc65235ea338717520954dcf6ecd4d76bf887eba3cbc91f
+        image: postgres:18-trixie
         container_name: postgres # zitadel (stack 12) resolves this name on stack_default
         restart: unless-stopped
         # The entrypoint treats SIGTERM as a "smart" shutdown that WAITS for
@@ -192,7 +199,7 @@ services:
             # with ALTER ROLE, not by changing this value.
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the Portainer stack env vars (wrap in SINGLE quotes if it contains $)}
         volumes:
-            - /home/oliver/docker/volumes/postgres_storage:/var/lib/postgresql/data
+            - /home/oliver/docker/postgres/data:/var/lib/postgresql
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -q -U postgres -d postgres"]
             interval: 30s
