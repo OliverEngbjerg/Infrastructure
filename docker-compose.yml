@@ -93,7 +93,7 @@ services:
             - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
 
     jellyfin:
-        image: linuxserver/jellyfin:latest
+        image: "ghcr.io/jellyfin/jellyfin:latest"
         container_name: jellyfin
         restart: unless-stopped
         ports:
