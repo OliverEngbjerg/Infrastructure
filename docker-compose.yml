@@ -92,8 +92,12 @@ services:
             - ./nginx/letsencrypt:/certs:ro
             - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
 
+    # Pinned: 10.11.6 had CVE-2026-35033 (unauth arbitrary file read, 9.1)
+    # and :latest is now Jellyfin 12.x, a major bump that migrates the library
+    # db. Not ghcr.io/jellyfin/jellyfin either - different /config layout, the
+    # .jellyfin-* markers make it crash-loop (tried 2026-09-19).
     jellyfin:
-        image: "ghcr.io/jellyfin/jellyfin:latest"
+        image: linuxserver/jellyfin:version-10.11.11ubu2604
         container_name: jellyfin
         restart: unless-stopped
         ports:
@@ -106,6 +110,10 @@ services:
             - jellyfin_config:/config
             - "/media/SeagateHub/Film og serier/Film:/data/Film"
             - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
+            # Test clip on the same drive as the real media, own "Healthcheck"
+            # library, metadata downloaders off. Kuma polls, no api key needed:
+            #   /Videos/db5830e1096caa8f42abe21ab0fc27be/stream?static=true
+            #   header {"Range": "bytes=0-65535"} -> 206
             - "/media/SeagateHub/Film og serier/Healthcheck:/data/Healthcheck"
 
     caddy:
