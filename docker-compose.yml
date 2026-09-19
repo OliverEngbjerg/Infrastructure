@@ -106,6 +106,30 @@ services:
             - jellyfin_config:/config
             - "/media/SeagateHub/Film og serier/Film:/data/Film"
             - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
+            # A generated 30s h264/aac clip, added to Jellyfin as its own
+            # "Healthcheck" movie library. Uptime Kuma (on the DO droplet) does
+            # a ranged GET of this movie's stream URL, so the monitor fails when
+            # media is actually unplayable and not just when the web server is
+            # down. It lives on the SAME physical drive as the real media on
+            # purpose: a copy on local disk would keep passing while the Seagate
+            # fuseblk mount was gone, which is the failure this exists to catch.
+            #
+            # Kuma monitor: GET https://jellyfin.engbjerg.com/Videos/<ItemId>/stream?static=true&api_key=<key>
+            #   header  {"Range": "bytes=0-65535"}   -> 206, ~64KB, not the whole 2.4MB every minute
+            # <ItemId> is stable until the library is removed and re-added; get it from
+            #   /Items?Recursive=true&SearchTerm=Jellyfin%20Healthcheck&api_key=<key>
+            # Turn OFF metadata downloaders on this library - if TMDB matches it
+            # to some real 1970 film, Jellyfin renames the item.
+            #
+            # Regenerate the clip with:
+            #   docker run --rm -v "/media/SeagateHub/Film og serier/Healthcheck/Jellyfin Healthcheck (1970):/out" \
+            #     --entrypoint /usr/lib/jellyfin-ffmpeg/ffmpeg linuxserver/jellyfin:latest \
+            #     -y -f lavfi -i "testsrc2=size=640x360:rate=24:duration=30" \
+            #     -f lavfi -i "sine=frequency=440:duration=30" \
+            #     -c:v libx264 -preset veryfast -pix_fmt yuv420p -b:v 500k \
+            #     -c:a aac -b:a 128k -ac 2 -movflags +faststart -shortest \
+            #     "/out/Jellyfin Healthcheck (1970).mp4"
+            - "/media/SeagateHub/Film og serier/Healthcheck:/data/Healthcheck"
 
     caddy:
         image: caddy:alpine
