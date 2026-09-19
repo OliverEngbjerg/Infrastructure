@@ -92,12 +92,12 @@ services:
             - ./nginx/letsencrypt:/certs:ro
             - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
 
-    # Pinned: 10.11.6 had CVE-2026-35033 (unauth arbitrary file read, 9.1)
-    # and :latest is now Jellyfin 12.x, a major bump that migrates the library
-    # db. Not ghcr.io/jellyfin/jellyfin either - different /config layout, the
-    # .jellyfin-* markers make it crash-loop (tried 2026-09-19).
+    # On :latest deliberately - currently Jellyfin 12.x. A redeploy can bring a
+    # major version unattended and the 12.x db migration is one-way, so back up
+    # jellyfin_config first. Not ghcr.io/jellyfin/jellyfin - different /config
+    # layout, the .jellyfin-* markers make it crash-loop (tried 2026-09-19).
     jellyfin:
-        image: linuxserver/jellyfin:version-10.11.11ubu2604
+        image: linuxserver/jellyfin:latest
         container_name: jellyfin
         restart: unless-stopped
         ports:
