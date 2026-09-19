@@ -92,8 +92,24 @@ services:
             - ./nginx/letsencrypt:/certs:ro
             - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
 
+    # PINNED, and not to :latest, for two reasons found on 2026-09-19:
+    #
+    # 1. The running image was 10.11.6, which is vulnerable to CVE-2026-35033
+    #    (CVSS 9.1): unauthenticated ffmpeg argument injection via StreamOptions
+    #    on /Videos/{id}/stream, giving arbitrary file read off this host. That
+    #    endpoint is reachable from the public internet through NPM with no auth
+    #    at all - verified from outside the network. Fixed in 10.11.7; this is
+    #    10.11.11, the last release in the 10.11 line.
+    #
+    # 2. :latest now resolves to Jellyfin 12.1, two major versions up. The old
+    #    :latest pin was a landmine - the next "Pull and redeploy" would have
+    #    jumped 10.11 -> 12 unattended and migrated the library database. Same
+    #    reasoning as postgres below: major version moves stay deliberate.
+    #
+    # Moving to 12.x is its own project: back up the jellyfin_config volume
+    # first, since the library db migration is not reversible.
     jellyfin:
-        image: linuxserver/jellyfin:latest
+        image: linuxserver/jellyfin:version-10.11.11ubu2604
         container_name: jellyfin
         restart: unless-stopped
         ports:
