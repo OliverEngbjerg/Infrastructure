@@ -98,6 +98,9 @@ services:
     # layout, the .jellyfin-* markers make it crash-loop (tried 2026-09-19).
     jellyfin:
         image: linuxserver/jellyfin:latest
+        # Without this a redeploy keeps whatever :latest already means locally -
+        # which is how this sat on a 6-month-old image, CVE and all.
+        pull_policy: always
         container_name: jellyfin
         restart: unless-stopped
         ports:
