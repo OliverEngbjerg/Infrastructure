@@ -1,6 +1,7 @@
 services:
     nginxproxymanager:
         image: "jc21/nginx-proxy-manager:latest"
+        pull_policy: always
         container_name: nginxproxymanager
         restart: unless-stopped
         ports:
@@ -13,6 +14,7 @@ services:
 
     ddnsupdater:
         image: qmcgaw/ddns-updater
+        pull_policy: always
         container_name: ddnsupdater
         restart: unless-stopped
         environment:
@@ -21,6 +23,7 @@ services:
 
     watchtower:
         image: nickfedor/watchtower
+        pull_policy: always
         container_name: watchtower
         restart: unless-stopped
         volumes:
@@ -32,6 +35,7 @@ services:
 
     ntfy:
         image: binwiederhier/ntfy
+        pull_policy: always
         container_name: ntfy
         restart: unless-stopped
         command: serve
@@ -92,14 +96,8 @@ services:
             - ./nginx/letsencrypt:/certs:ro
             - idle-rpg-data:/usr/src/idle-rpg/src/back-end/core/db
 
-    # On :latest deliberately - currently Jellyfin 12.x. A redeploy can bring a
-    # major version unattended and the 12.x db migration is one-way, so back up
-    # jellyfin_config first. Not ghcr.io/jellyfin/jellyfin - different /config
-    # layout, the .jellyfin-* markers make it crash-loop (tried 2026-09-19).
     jellyfin:
         image: linuxserver/jellyfin:latest
-        # Without this a redeploy keeps whatever :latest already means locally -
-        # which is how this sat on a 6-month-old image, CVE and all.
         pull_policy: always
         container_name: jellyfin
         restart: unless-stopped
@@ -113,14 +111,11 @@ services:
             - jellyfin_config:/config
             - "/media/SeagateHub/Film og serier/Film:/data/Film"
             - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
-            # Test clip on the same drive as the real media, own "Healthcheck"
-            # library, metadata downloaders off. Kuma polls, no api key needed:
-            #   /Videos/db5830e1096caa8f42abe21ab0fc27be/stream?static=true
-            #   header {"Range": "bytes=0-65535"} -> 206
             - "/media/SeagateHub/Film og serier/Healthcheck:/data/Healthcheck"
 
     caddy:
         image: caddy:alpine
+        pull_policy: always
         container_name: caddy
         restart: unless-stopped
         volumes:
@@ -129,15 +124,9 @@ services:
             - ./oliver-files:/usr/share/caddy
         command: caddy file-server --browse --root /usr/share/caddy --listen :80
 
-    # CalDAV/CardDAV server. Reached via NPM at radicale:5232 (no host port).
-    # Config and htpasswd users are mounted from the inline `configs:` at the bottom.
-    # RADICALE_USERS is a Portainer stack env var holding a "user:bcrypt-hash" line.
-    # In Portainer, wrap the value in SINGLE QUOTES ('user:$2b$12$...') - otherwise
-    # Compose expands the $-parts of the hash as variables and corrupts it.
-    # No read_only here: Compose injects inline configs with `docker cp`, which
-    # Docker refuses on a read-only rootfs (container is left in "Created").
     radicale:
         image: tomsquest/docker-radicale:latest
+        pull_policy: always
         container_name: radicale
         restart: unless-stopped
         init: true
@@ -161,54 +150,17 @@ services:
         volumes:
             - radicale_data:/data
 
-    # PostgreSQL 18. Adopted 2026-09 from a bare `docker run` that carried no
-    # compose labels, so this stack could not see or manage it, then upgraded
-    # 14.21 -> 18.6 in place with pg_upgrade --link via pgautoupgrade.
-    #
-    # MOUNT SHAPE MATTERS. PG18 moved PGDATA from /var/lib/postgresql/data to
-    # /var/lib/postgresql/<major>/docker, so the mount target is the PARENT
-    # /var/lib/postgresql and the real PGDATA is .../data/18/docker on the host.
-    # The host path keeps the name `data` for historical reasons - it was the
-    # PG14 PGDATA before the upgrade. Do not "tidy" it without moving the
-    # cluster; the image derives PGDATA from its own default, not from here.
-    #
-    # An ABSOLUTE HOST BIND MOUNT on purpose:
-    #   * the directory holds ~246 GB of live data
-    #   * a RELATIVE path would resolve against /data/compose/6, not the git
-    #     checkout, and would silently initdb an EMPTY cluster
-    #   * a named volume cannot be used: the old `postgres_storage` volume was
-    #     on the obsolete local-persist driver and Docker will not change an
-    #     existing volume's driver
-    # If you ever change this path, check it twice. A wrong path does not
-    # error - it initdb's a NEW EMPTY cluster instead, which is exactly what
-    # happened once during the 2026-09 upgrade before the path was corrected.
-    #
-    # Deliberately NOT watchtower-labelled: image moves must stay manual so a
-    # major version bump can never happen by surprise and eat the cluster.
-    # The tag floats within 18.x so patch releases arrive on deliberate redeploy.
     postgres:
         image: postgres:18-trixie
-        container_name: postgres # zitadel (stack 12) resolves this name on stack_default
+        container_name: postgres
         restart: unless-stopped
-        # The entrypoint treats SIGTERM as a "smart" shutdown that WAITS for
-        # clients to disconnect, overruns the grace period and gets SIGKILLed -
-        # which is why the last restart went through crash recovery. SIGINT is a
-        # fast shutdown: disconnect clients, checkpoint, exit cleanly.
         stop_signal: SIGINT
         stop_grace_period: 5m
-        shm_size: 1gb # Docker's 64MB default is too small for parallel query
+        shm_size: 1gb
         ports:
-            # LAN address only, NEVER 0.0.0.0. ufw does not filter Docker
-            # published ports (the DOCKER-USER chain is empty), so 0.0.0.0 here
-            # means "internet-exposed the moment anything forwards 5432" - which
-            # is exactly how this server absorbed 202k brute-force attempts in
-            # Sept 2026. 192.168.1.23 is static in /etc/netplan/99_config.yaml.
             - "192.168.1.23:5432:5432"
         environment:
             TZ: Europe/Copenhagen
-            # INERT on an existing PGDATA - the entrypoint only reads this when
-            # it runs initdb on an empty directory. Rotate the real password
-            # with ALTER ROLE, not by changing this value.
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the Portainer stack env vars (wrap in SINGLE quotes if it contains $)}
         volumes:
             - /home/oliver/docker/postgres/data:/var/lib/postgresql
