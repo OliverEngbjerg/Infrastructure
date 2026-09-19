@@ -114,12 +114,25 @@ services:
             # purpose: a copy on local disk would keep passing while the Seagate
             # fuseblk mount was gone, which is the failure this exists to catch.
             #
-            # Kuma monitor: GET https://jellyfin.engbjerg.com/Videos/<ItemId>/stream?static=true&api_key=<key>
-            #   header  {"Range": "bytes=0-65535"}   -> 206, ~64KB, not the whole 2.4MB every minute
-            # <ItemId> is stable until the library is removed and re-added; get it from
-            #   /Items?Recursive=true&SearchTerm=Jellyfin%20Healthcheck&api_key=<key>
-            # Turn OFF metadata downloaders on this library - if TMDB matches it
-            # to some real 1970 film, Jellyfin renames the item.
+            # Kuma monitor (verified 2026-09-19, returns 206 + 64KB + mp4 magic):
+            #   GET https://jellyfin.engbjerg.com/Videos/db5830e1096caa8f42abe21ab0fc27be/stream?static=true
+            #   header  {"Range": "bytes=0-65535"}
+            # The Range header matters: without it Kuma pulls all 2.4MB per poll.
+            # 206 falls inside Kuma's default accepted range (200-299).
+            #
+            # NO API KEY - Jellyfin serves static media endpoints unauthenticated,
+            # so the item id is the only credential. That is upstream behaviour,
+            # not a setting here; it is also why this monitor needs no secret.
+            #
+            # The item id is stable until the library is removed and re-added. If
+            # it ever changes, re-read it from the live library db (a COPY of it -
+            # do not open the live file):
+            #   /config/data/data/jellyfin.db -> SELECT Id, Name, Path FROM BaseItems
+            #                                    WHERE Path LIKE '/data/Healthcheck/%'
+            # then lowercase it and strip the dashes for the URL.
+            #
+            # Keep metadata downloaders OFF for this library - if TMDB matches it
+            # to some real 1970 film, Jellyfin renames the item and re-ids it.
             #
             # Regenerate the clip with:
             #   docker run --rm -v "/media/SeagateHub/Film og serier/Healthcheck/Jellyfin Healthcheck (1970):/out" \
