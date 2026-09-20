@@ -171,42 +171,22 @@ services:
             retries: 5
             start_period: 120s
 
-    # OIDC provider for OpenIdle. It lives in this stack, not the openidle one,
-    # because all its state is in the postgres above - the openidle stack holds
-    # nothing but its own images.
-    #
-    # Before the first start, create its role and database by hand, using the
-    # same password as ZITADEL_DB_PASSWORD:
-    #   CREATE ROLE zitadel LOGIN PASSWORD '<ZITADEL_DB_PASSWORD>';
-    #   CREATE DATABASE zitadel OWNER zitadel;
-    #
-    # In NPM, only the sign-in paths are public; the Console and the
-    # management/admin APIs are LAN-only.
-    # No watchtower label since upgrades run DB migrations.
     zitadel:
         image: ghcr.io/zitadel/zitadel:v4.17.3
         container_name: zitadel
         restart: unless-stopped
-        # Root so it can write the login client PAT into the shared bootstrap volume
         user: "0"
         command: start-from-init --masterkeyFromEnv
         environment:
-            # Encrypts Zitadel's stored keys. Exactly 32 characters (openssl rand -hex 16).
-            # It must never change once Zitadel has started; back it up.
             ZITADEL_MASTERKEY: ${ZITADEL_MASTERKEY:?set ZITADEL_MASTERKEY (exactly 32 chars, openssl rand -hex 16) in the Portainer stack env vars}
             ZITADEL_PORT: 8080
-            # Bare hostname, no scheme. Baked into the issuer and login URLs, so
-            # changing it after the first start means reconfiguring the instance.
-            ZITADEL_EXTERNALDOMAIN: ${ZITADEL_HOST:?set ZITADEL_HOST (bare hostname, e.g. auth-openidle.engbjerg.com) in the Portainer stack env vars}
+            ZITADEL_EXTERNALDOMAIN: ${ZITADEL_HOST:?set ZITADEL_HOST (bare hostname, e.g. auth.engbjerg.com) in the Portainer stack env vars}
             ZITADEL_EXTERNALPORT: 443
             ZITADEL_EXTERNALSECURE: "true"
             ZITADEL_TLS_ENABLED: "false"
-            # Goes into a connection URL, so keep it URL-safe: openssl rand -hex 24
             ZITADEL_DATABASE_POSTGRES_DSN: postgresql://zitadel:${ZITADEL_DB_PASSWORD:?set ZITADEL_DB_PASSWORD (URL-safe, openssl rand -hex 24) in the Portainer stack env vars}@postgres:5432/zitadel?sslmode=disable
-            ZITADEL_FIRSTINSTANCE_ORG_NAME: OpenIdle
+            ZITADEL_FIRSTINSTANCE_ORG_NAME: Engbjerg
             ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin
-            # Upper case, lower case, a digit and a symbol, 8+ characters. Only read
-            # on the very first start against an empty database; changing it later does nothing.
             ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD:?set ZITADEL_ADMIN_PASSWORD (upper, lower, digit, symbol, 8+ chars) in the Portainer stack env vars}
             ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
             ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
