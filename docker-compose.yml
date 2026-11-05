@@ -101,8 +101,6 @@ services:
         pull_policy: always
         container_name: jellyfin
         restart: unless-stopped
-        ports:
-            - "8096:8096"
         environment:
             - PUID=1000
             - PGID=1000
@@ -122,8 +120,6 @@ services:
         pull_policy: always
         container_name: sonarr
         restart: unless-stopped
-        ports:
-            - "192.168.1.23:8989:8989"
         environment:
             - PUID=1000
             - PGID=1000
@@ -137,8 +133,6 @@ services:
         pull_policy: always
         container_name: radarr
         restart: unless-stopped
-        ports:
-            - "192.168.1.23:7878:7878"
         environment:
             - PUID=1000
             - PGID=1000
@@ -152,8 +146,6 @@ services:
         pull_policy: always
         container_name: bazarr
         restart: unless-stopped
-        ports:
-            - "192.168.1.23:6767:6767"
         environment:
             - PUID=1000
             - PGID=1000
@@ -167,8 +159,6 @@ services:
         pull_policy: always
         container_name: prowlarr
         restart: unless-stopped
-        ports:
-            - "192.168.1.23:9696:9696"
         environment:
             - PUID=1000
             - PGID=1000
@@ -181,8 +171,6 @@ services:
         pull_policy: always
         container_name: qbittorrent
         restart: unless-stopped
-        ports:
-            - "192.168.1.23:8085:8085"
         environment:
             - PUID=1000
             - PGID=1000
@@ -198,8 +186,6 @@ services:
         container_name: seerr
         restart: unless-stopped
         init: true
-        ports:
-            - "192.168.1.23:5055:5055"
         environment:
             - TZ=Europe/Copenhagen
             - LOG_LEVEL=info
