@@ -115,7 +115,7 @@ services:
 
     # Media pipeline: Seerr takes requests, Sonarr/Radarr import from Encoded (B) into the
     # library, Bazarr fetches subtitles. No indexers or download clients are configured.
-    # Admin UIs are LAN only; Seerr is public through NPM (jellyseerr.engbjerg.com -> seerr:5055).
+    # Admin UIs are LAN only; Seerr is public through NPM (seerr.engbjerg.com -> seerr:5055).
     sonarr:
         image: lscr.io/linuxserver/sonarr:latest
         pull_policy: always
