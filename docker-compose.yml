@@ -113,8 +113,9 @@ services:
             - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
             - "/media/SeagateHub/Film og serier/Healthcheck:/data/Healthcheck"
 
-    # Media pipeline: Seerr takes requests, Sonarr/Radarr import from Encoded (B) into the
-    # library, Bazarr fetches subtitles. No indexers or download clients are configured.
+    # Media pipeline: Seerr takes requests, Prowlarr feeds indexers to Sonarr/Radarr, qBittorrent
+    # downloads into Incoming where the PC encoder re-encodes to Encoded (B), Sonarr/Radarr import
+    # into the library, Bazarr fetches subtitles.
     # Admin UIs are LAN only; Seerr is public through NPM (seerr.engbjerg.com -> seerr:5055).
     sonarr:
         image: lscr.io/linuxserver/sonarr:latest
@@ -159,6 +160,36 @@ services:
             - TZ=Europe/Copenhagen
         volumes:
             - bazarr_config:/config
+            - "/media/SeagateHub/Film og serier:/data"
+
+    prowlarr:
+        image: lscr.io/linuxserver/prowlarr:latest
+        pull_policy: always
+        container_name: prowlarr
+        restart: unless-stopped
+        ports:
+            - "192.168.1.23:9696:9696"
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - TZ=Europe/Copenhagen
+        volumes:
+            - prowlarr_config:/config
+
+    qbittorrent:
+        image: lscr.io/linuxserver/qbittorrent:latest
+        pull_policy: always
+        container_name: qbittorrent
+        restart: unless-stopped
+        ports:
+            - "192.168.1.23:8085:8085"
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - TZ=Europe/Copenhagen
+            - WEBUI_PORT=8085
+        volumes:
+            - qbittorrent_config:/config
             - "/media/SeagateHub/Film og serier:/data"
 
     seerr:
@@ -426,6 +457,8 @@ volumes:
     sonarr_config:
     radarr_config:
     bazarr_config:
+    prowlarr_config:
+    qbittorrent_config:
     seerr_config:
     radicale_data:
     zitadel_bootstrap:
