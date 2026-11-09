@@ -179,6 +179,28 @@ services:
         volumes:
             - qbittorrent_config:/config
             - "/media/SeagateHub/Film og serier:/data"
+        networks:
+            - default
+            - qbt_gate
+
+    # Stops downloads (tag waiting-for-space) until MIN_FREE_GB would still be free after them.
+    # qBittorrent lets 10.89.12.2 in without a password (WebUI AuthSubnetWhitelist).
+    qbittorrent-space-gate:
+        image: python:3.13-alpine
+        pull_policy: always
+        container_name: qbittorrent-space-gate
+        restart: unless-stopped
+        command: ["python3", "-u", "/space_gate.py"]
+        environment:
+            - MIN_FREE_GB=40
+        configs:
+            - source: qbittorrent_space_gate
+              target: /space_gate.py
+        volumes:
+            - "/media/SeagateHub/Film og serier:/data:ro"
+        networks:
+            qbt_gate:
+                ipv4_address: 10.89.12.2
 
     seerr:
         image: ghcr.io/seerr-team/seerr:v3
@@ -454,6 +476,13 @@ volumes:
     mcskyfactory5_data:
     mcstoneblock_data:
 
+networks:
+    qbt_gate:
+        internal: true
+        ipam:
+            config:
+                - subnet: 10.89.12.0/29
+
 # Configs must be inline `content:` here. `file:` configs are bind mounts resolved
 # against host /data/compose/6, where Portainer's git checkout does not exist.
 configs:
@@ -477,6 +506,207 @@ configs:
     #     -c 'import os,bcrypt;print(os.environ["U"]+":"+bcrypt.hashpw(os.environ["PW"].encode(),bcrypt.gensalt()).decode())'
     radicale_users:
         content: ${RADICALE_USERS:?set RADICALE_USERS (user:bcrypt-hash) in the Portainer stack env vars}
+    qbittorrent_space_gate:
+        content: |
+            """Lets a qBittorrent download run only while MIN_FREE_GB would still be free once it finishes.
+
+            Every INTERVAL seconds the budget is free space minus MIN_FREE minus what forced and checking
+            downloads still have to write. Downloads get it in queue order; one that does not fit is
+            stopped and tagged TAG, and started again (tag removed) once it fits. Torrents stopped by hand
+            (stopped without TAG) are never touched, nor are forced ones, finished ones or missing files.
+            """
+            import http.cookiejar
+            import json
+            import os
+            import signal
+            import sys
+            import time
+            import urllib.parse
+            import urllib.request
+
+            URL = os.environ.get('QBT_URL', 'http://qbittorrent:8085').rstrip('/')
+            SPACE_PATH = os.environ.get('SPACE_PATH', '/data/Incoming')     # on the same drive as the save path
+            MIN_FREE = float(os.environ.get('MIN_FREE_GB', '40')) * 1e9
+            INTERVAL = float(os.environ.get('INTERVAL', '15'))
+            TAG = os.environ.get('TAG', 'waiting-for-space')
+            HOLD_HOURS = float(os.environ.get('HOLD_HOURS', '24'))  # held this long: first claim, for up to 2x as long
+            DRY_RUN = os.environ.get('DRY_RUN') == '1'
+            SLACK = 2e9             # held ones start this far under the line, the rest stop this far over it
+            ERROR_RETRY = 600       # seconds between starts of a download that keeps erroring
+            MIN_DISK = 1e12         # SPACE_PATH must be the big drive, not an empty mount point on the system disk
+            SETTLE_TICKS = 8        # ticks to wait for qBittorrent's start-up check before acting anyway
+            MAX_FAILURES = 40       # 10 min of failed checks: exit, e.g. to pick up a re-mounted drive
+
+            STOPPED = {'stoppedDL', 'pausedDL'}
+            CHECKING = {'checkingDL', 'checkingUP', 'allocating', 'moving', 'checkingResumeData', 'metaDL', 'forcedMetaDL'}
+            RUNNING = {'downloading', 'stalledDL', 'queuedDL', 'metaDL', 'forcedDL', 'forcedMetaDL',
+                       'uploading', 'stalledUP', 'queuedUP', 'forcedUP'}
+            OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+
+
+            def log(message):
+                print(time.strftime('%Y-%m-%d %H:%M:%S ') + message, flush=True)
+
+
+            def api(path, form=None):
+                data = urllib.parse.urlencode(form).encode() if form is not None else None
+                with OPENER.open(urllib.request.Request(f'{URL}/api/v2/{path}', data=data), timeout=30) as r:
+                    body = r.read()
+                return json.loads(body) if body[:1] in (b'{', b'[') else body
+
+
+            def disk_free():
+                """(free, total) bytes of SPACE_PATH, read now (qBittorrent's own figure can be 30 s old)."""
+                st = os.statvfs(SPACE_PATH)
+                return st.f_bavail * st.f_frsize, st.f_blocks * st.f_frsize
+
+
+            def tags_of(t):
+                return {x.strip() for x in (t.get('tags') or '').split(',') if x.strip()}
+
+
+            def plan(torrents, free, stopped, error_tried, held_since, now, wall, was_writing=frozenset()):
+                """Returns (to_stop, to_start, budget left, the long-waiting torrent with first claim or None,
+                hashes writing now). stopped: hashes qBittorrent reports as stopped (an 'error' state hides
+                that); error_tried: hash -> last start of an erroring download; held_since: hash -> wall time
+                it first did not fit; was_writing: hashes writing on the previous tick."""
+                budget = free - MIN_FREE
+                candidates, to_start = [], []
+                for t in torrents:
+                    state, left, ours = t.get('state'), t.get('amount_left') or 0, TAG in tags_of(t)
+                    is_stopped = state in STOPPED or t['hash'] in stopped
+                    if left <= 0:
+                        if is_stopped and ours and state in ('stoppedUP', 'pausedUP'):
+                            to_start.append(t)                      # finished while held (files deselected): needs no room
+                        continue                                    # finished, or no metadata yet
+                    if is_stopped:
+                        if ours and (state in STOPPED or state == 'error'):
+                            candidates.append((t, 'held'))          # held by us; stopped by hand is never touched
+                    elif t.get('force_start') or state in CHECKING or state in ('forcedDL', 'forcedMetaDL'):
+                        budget -= left                              # will write; never touched
+                    elif state in ('downloading', 'stalledDL'):
+                        candidates.append((t, 'writing'))
+                    elif state in ('queuedDL', 'error'):
+                        candidates.append((t, state))
+                # Queue order, so a new download never jumps ahead of one already waiting.
+                queue_pos = lambda c: (c[0]['priority'] if c[0].get('priority', 0) > 0 else 1 << 30, c[0].get('added_on', 0))
+                to_stop, reserved = [], None
+                for t, kind in sorted(candidates, key=queue_pos):
+                    left, h = t['amount_left'], t['hash']
+                    if reserved and not (kind == 'writing' and h in was_writing):
+                        fits = False                                # a long-waiting download has first claim on freed room
+                    elif kind == 'held':
+                        fits = left + SLACK <= budget               # start with room to spare...
+                    else:
+                        fits = left <= budget + SLACK               # ...stop only when clearly over, so nothing flaps
+                    if fits:
+                        budget -= left
+                        held_since.pop(h, None)
+                        if t.get('state') == 'error' and now - error_tried.get(h, float('-inf')) < ERROR_RETRY:
+                            continue
+                        if kind in ('held', 'error'):
+                            to_start.append(t)
+                    else:
+                        if kind != 'held':
+                            to_stop.append(t)
+                        if kind != 'writing':
+                            waited = wall - held_since.setdefault(h, wall)
+                            # Only for a while: one that cannot fit for days must not block the queue for good.
+                            if not reserved and HOLD_HOURS * 3600 < waited < 3 * HOLD_HOURS * 3600:
+                                reserved = t
+                writing = {t['hash'] for t, kind in candidates if kind == 'writing'} - {t['hash'] for t in to_stop}
+                return to_stop, to_start, budget, reserved, writing
+
+
+            def act(action, torrents):
+                log(f'{"(dry run) " if DRY_RUN else ""}{action}: {", ".join(t["name"] for t in torrents)}')
+                if DRY_RUN:
+                    return
+                hashes = '|'.join(t['hash'] for t in torrents)
+                if action == 'stop':        # tag first: a torrent stopped without the tag would look stopped by hand
+                    api('torrents/addTags', {'hashes': hashes, 'tags': TAG})
+                    api('torrents/stop', {'hashes': hashes})
+                else:                       # start first: a failed start keeps the tag and is retried
+                    api('torrents/start', {'hashes': hashes})
+                    api('torrents/removeTags', {'hashes': hashes, 'tags': TAG})
+
+
+            class Gate:
+                def __init__(self):
+                    self.error_tried, self.held_since = {}, {}
+                    self.settling, self.note, self.writing, self.reserved = 0, None, frozenset(), None
+
+                def tick(self):
+                    data = api('sync/maindata')
+                    stopped = {x['hash'] for x in api('torrents/info?filter=stopped')}
+                    torrents = [dict(t, hash=h) for h, t in (data.get('torrents') or {}).items()]
+                    for memory in (self.error_tried, self.held_since):
+                        for h in set(memory) - {t['hash'] for t in torrents}:
+                            del memory[h]
+                    free, total = disk_free()
+                    if total < MIN_DISK:
+                        raise ValueError(f'{SPACE_PATH} is not on the download drive ({total / 1e9:.0f} GB)')
+                    reported = (data.get('server_state') or {}).get('free_space_on_disk')
+                    if isinstance(reported, (int, float)) and not isinstance(reported, bool) and reported >= 0:
+                        free = min(free, reported)
+                    # After a qBittorrent restart every torrent is checked first and its state is unreliable.
+                    if any(t.get('state') == 'checkingResumeData' for t in torrents):
+                        if self.settling < SETTLE_TICKS:
+                            self.settling += 1
+                            return
+                    else:
+                        self.settling = 0
+                    now, wall = time.monotonic(), time.time()
+                    to_stop, to_start, budget, reserved, self.writing = plan(
+                        torrents, free, stopped, self.error_tried, self.held_since, now, wall, self.writing)
+                    name = reserved and reserved['name']
+                    if name != self.reserved:
+                        log(f'{name} has waited over {HOLD_HOURS:.0f} h: it gets the next free room first' if name
+                            else 'no download has first claim any more')
+                        self.reserved = name
+                    if to_stop:
+                        act('stop', to_stop)
+                    if to_start:
+                        for t in to_start:
+                            if t.get('state') == 'error':
+                                self.error_tried[t['hash']] = now
+                        act('start', to_start)
+                    # A tagged download that someone started (or forced) by hand is no longer waiting on us.
+                    stray = [t for t in torrents if TAG in tags_of(t) and (t.get('state') in RUNNING or t.get('force_start'))
+                             and t['hash'] not in stopped and t not in to_stop]
+                    if stray and not DRY_RUN:
+                        api('torrents/removeTags', {'hashes': '|'.join(t['hash'] for t in stray), 'tags': TAG})
+                    held = ({t['hash'] for t in torrents if TAG in tags_of(t)} - {t['hash'] for t in stray + to_start}) | \
+                        {t['hash'] for t in to_stop}
+                    note = f'{len(held)} waiting for space'
+                    if note != self.note:
+                        log(f'free {free / 1e9:.1f} GB, {note}, {max(budget, 0) / 1e9:.1f} GB unclaimed')
+                        self.note = note
+
+
+            def main():
+                signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+                log(f'start: keep {MIN_FREE / 1e9:.0f} GB free after downloads, checking every {INTERVAL:.0f}s'
+                    f'{" (dry run)" if DRY_RUN else ""}')
+                gate, failures = Gate(), 0
+                while True:
+                    try:
+                        gate.tick()
+                        if failures:
+                            log('working again')
+                        failures = 0
+                    except Exception as e:      # qBittorrent restarting, the drive gone, or an unexpected reply
+                        failures += 1
+                        if failures % 20 == 1:
+                            log(f'skipped a check ({type(e).__name__}: {e}), failure {failures}')
+                        if failures >= MAX_FAILURES:
+                            log('giving up; the restart policy starts the container again with fresh mounts')
+                            sys.exit(1)
+                    time.sleep(INTERVAL)
+
+
+            if __name__ == '__main__':
+                main()
     crowdsec_acquis:
         content: |
             filenames:
