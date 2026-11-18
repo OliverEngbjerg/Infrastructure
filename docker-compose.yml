@@ -107,13 +107,13 @@ services:
             - TZ=Europe/Copenhagen
         volumes:
             - jellyfin_config:/config
-            - "/media/SeagateHub/Film og serier/Film:/data/Film"
-            - "/media/SeagateHub/Film og serier/Serier:/data/Serier"
-            - "/media/SeagateHub/Film og serier/Healthcheck:/data/Healthcheck"
+            - "/srv/media/library/Film:/data/Film"
+            - "/srv/media/library/Serier:/data/Serier"
+            - "/srv/media/library/Healthcheck:/data/Healthcheck"
 
-    # Media pipeline: Seerr takes requests, Prowlarr feeds indexers to Sonarr/Radarr, qBittorrent
-    # downloads into Incoming where the PC encoder re-encodes to Encoded (B), Sonarr/Radarr import
-    # into the library, Bazarr fetches subtitles.
+    # Media pipeline: Seerr takes requests, Prowlarr feeds indexers, qBittorrent downloads into /data/Incoming,
+    # Sonarr/Radarr hardlink-import into the library, the PC encoder re-encodes in place over SMB, Bazarr adds subtitles.
+    # Library is the 20 TB WD at /srv/media (nofail; /srv/media is chattr +i so these binds fail if it is not mounted).
     # Admin UIs are LAN only; Seerr is public through NPM (seerr.engbjerg.com -> seerr:5055).
     sonarr:
         image: lscr.io/linuxserver/sonarr:latest
@@ -126,7 +126,7 @@ services:
             - TZ=Europe/Copenhagen
         volumes:
             - sonarr_config:/config
-            - "/media/SeagateHub/Film og serier:/data"
+            - "/srv/media/library:/data"
 
     radarr:
         image: lscr.io/linuxserver/radarr:latest
@@ -139,7 +139,7 @@ services:
             - TZ=Europe/Copenhagen
         volumes:
             - radarr_config:/config
-            - "/media/SeagateHub/Film og serier:/data"
+            - "/srv/media/library:/data"
 
     bazarr:
         image: lscr.io/linuxserver/bazarr:latest
@@ -152,7 +152,7 @@ services:
             - TZ=Europe/Copenhagen
         volumes:
             - bazarr_config:/config
-            - "/media/SeagateHub/Film og serier:/data"
+            - "/srv/media/library:/data"
 
     prowlarr:
         image: lscr.io/linuxserver/prowlarr:latest
@@ -178,7 +178,7 @@ services:
             - WEBUI_PORT=8085
         volumes:
             - qbittorrent_config:/config
-            - "/media/SeagateHub/Film og serier:/data"
+            - "/srv/media/library:/data"
         networks:
             - default
             - qbt_gate
@@ -197,7 +197,7 @@ services:
             - source: qbittorrent_space_gate
               target: /space_gate.py
         volumes:
-            - "/media/SeagateHub/Film og serier:/data:ro"
+            - "/srv/media/library:/data:ro"
         networks:
             qbt_gate:
                 ipv4_address: 10.89.12.2
