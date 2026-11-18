@@ -180,8 +180,9 @@ services:
             - qbittorrent_config:/config
             - "/srv/media/library:/data"
         networks:
-            - default
-            - qbt_gate
+            default:
+            qbt_gate:
+                ipv4_address: 10.89.12.3    # fixed, so it never takes the space gate's .2 on startup
 
     # Stops downloads (tag waiting-for-space) until MIN_FREE_GB would still be free after them.
     # qBittorrent lets 10.89.12.2 in without a password (WebUI AuthSubnetWhitelist).
