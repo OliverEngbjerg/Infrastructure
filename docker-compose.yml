@@ -203,6 +203,19 @@ services:
             qbt_gate:
                 ipv4_address: 10.89.12.2
 
+    # Removes dead downloads from the Sonarr/Radarr queue (blocklist + re-search). Settings: configs.decluttarr_config.
+    # Never touches stopped torrents (space gate holds, hand stops) or ones tagged Keep in qBittorrent.
+    decluttarr:
+        image: ghcr.io/manimatter/decluttarr:v2.2.0
+        pull_policy: always
+        container_name: decluttarr
+        restart: unless-stopped
+        environment:
+            - TZ=Europe/Copenhagen
+        configs:
+            - source: decluttarr_config
+              target: /app/config/config.yaml
+
     seerr:
         image: ghcr.io/seerr-team/seerr:v3
         pull_policy: always
@@ -708,6 +721,50 @@ configs:
 
             if __name__ == '__main__':
                 main()
+    # Decluttarr v2.2.0; jobs left out are off. Strikes count 10-min cycles and reset on every restart.
+    # test_run: true only logs ("triggered removal" = would remove); set false once the logs look right.
+    decluttarr_config:
+        content: |
+            general:
+                log_level: INFO
+                test_run: true
+                timer: 10
+                protected_tag: Keep
+            jobs:
+                remove_stalled:
+                    max_strikes: 72         # 12 h without data, so an overnight internet outage does not blocklist everything
+                remove_metadata_missing:
+                    max_strikes: 18         # 3 h stuck fetching metadata
+                remove_failed_imports:      # files gone or no usable video; 3 checks in a row, then blocklist + re-search
+                    max_strikes: 2
+                    message_patterns:
+                        - "No files found are eligible for import*"
+                remove_failed_downloads: true
+                remove_missing_files: false
+                remove_slow: false
+                remove_bad_files: false
+                remove_orphans: false       # would delete torrents the arrs do not own
+                remove_unmonitored: false
+                remove_done_seeding: false
+                detect_deletions: false
+                search_missing:             # periodic re-search of missing items; delete enabled: false to turn on
+                    enabled: false
+                    min_days_between_searches: 7
+                    max_concurrent_searches: 3
+                search_unmet_cutoff:
+                    enabled: false
+            instances:
+                sonarr:
+                    - base_url: http://sonarr:8989
+                      api_key: "${SONARR_API_KEY:?set SONARR_API_KEY (Sonarr > Settings > General) in the Portainer stack env vars}"
+                radarr:
+                    - base_url: http://radarr:7878
+                      api_key: "${RADARR_API_KEY:?set RADARR_API_KEY (Radarr > Settings > General) in the Portainer stack env vars}"
+            download_clients:
+                qbittorrent:
+                    - base_url: http://qbittorrent:8085
+                      name: qBittorrent     # must equal the client name in Sonarr and Radarr
+                      api_key: "${QBITTORRENT_API_KEY:?set QBITTORRENT_API_KEY (qBittorrent > Options > Web UI > API Key) in the Portainer stack env vars}"
     crowdsec_acquis:
         content: |
             filenames:
