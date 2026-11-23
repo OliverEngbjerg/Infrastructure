@@ -374,8 +374,9 @@ services:
               target: /etc/crowdsec/acquis.d/npm.yaml
 
     # Loads the newest .zip in the volume's saves/ dir. Game port is UDP only.
+    # Pinned: the image's :stable tag lagged at 2.1.24 after 2.1.25 went stable. Back to :stable once it catches up.
     factorio:
-        image: factoriotools/factorio:stable
+        image: factoriotools/factorio:2.1.25
         pull_policy: always
         container_name: factorio
         restart: unless-stopped
