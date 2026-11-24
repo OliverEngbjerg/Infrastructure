@@ -723,12 +723,12 @@ configs:
             if __name__ == '__main__':
                 main()
     # Decluttarr v2.2.0; jobs left out are off. Strikes count 10-min cycles and reset on every restart.
-    # test_run: true only logs ("triggered removal" = would remove); set false once the logs look right.
+    # test_run: true only logs ("triggered removal" = would remove). Live since a clean 20 h dry run (2026-11-24).
     decluttarr_config:
         content: |
             general:
                 log_level: INFO
-                test_run: true
+                test_run: false
                 timer: 10
                 protected_tag: Keep
             jobs:
