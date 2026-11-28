@@ -78,6 +78,33 @@ services:
             - "com.centurylinklabs.watchtower.enable=true"
         # Internal port: 3000
 
+    # Personal finance dashboard. Public through NPM (skejsight.engbjerg.com -> skejsight:3000).
+    # Syncs the bank once a day through bankmcp; its state (Enable Banking key and consent) is the
+    # host folder below, mode 700, owned by uid 1000 like the container's node user.
+    # The app does not migrate its schema itself: run `bun run db:migrate` from the repo after a
+    # release that adds a migration.
+    skejsight:
+        image: "ghcr.io/oliverengbjerg/skejsight:latest"
+        pull_policy: always
+        container_name: skejsight
+        restart: unless-stopped
+        labels:
+            - "com.centurylinklabs.watchtower.enable=true"
+        environment:
+            TZ: Europe/Copenhagen
+            ORIGIN: https://skejsight.engbjerg.com
+            # NPM is the only proxy in front, so the client address is the last X-Forwarded-For entry.
+            ADDRESS_HEADER: X-Forwarded-For
+            XFF_DEPTH: "1"
+            DATABASE_URL: ${SKEJSIGHT_DATABASE_URL:?set SKEJSIGHT_DATABASE_URL (postgres://skejsight:<percent-encoded password>@postgres:5432/skejsight) in the Portainer stack env vars}
+            APP_PASSWORD: ${SKEJSIGHT_APP_PASSWORD:?set SKEJSIGHT_APP_PASSWORD (12+ chars, the login password) in the Portainer stack env vars}
+        volumes:
+            - /home/oliver/docker/skejsight/bankmcp:/data/bankmcp
+        depends_on:
+            postgres:
+                condition: service_healthy
+        # Internal port: 3000
+
     idlerpg:
         image: "ghcr.io/frederikja163/idlerpg:latest"
         pull_policy: always
